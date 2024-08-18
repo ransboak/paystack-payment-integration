@@ -21,7 +21,7 @@ use App\Http\Controllers\UserController;
 Route::get('/', function () {
     //$posts = Post::where('user_id', auth()->id())->get();
     return view('home');
-});
+})->name('home');
 // Laravel 8 & 9
 // Route::get('/payment/callback', [PaystackController::class, 'handleGatewayCallback']);
 // // Laravel 8 & 9

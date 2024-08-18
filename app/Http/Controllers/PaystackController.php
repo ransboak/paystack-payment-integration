@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Unicodeveloper\Paystack\Facades\Paystack;
@@ -107,27 +108,31 @@ class PaystackController extends Controller
 
     //     return  $response;
     // }
+
+
+
     public function make_payment()
     {
         $formData = [
             'email' => request('email'),
-            'amount' => request('amount') * 100,
+            'amount' => 0.1 * 100,
             'callback_url' => route('pay.callback'),
             'currency' => 'GHS',
             "metadata" => [
-                    "custom_fields" => [
-                        [
-                            "display_name" => "Laptop",
-                            "variable_name" => "laptop",
-                            "value" => "Laptop"
-                        ],
-                        [
-                            "display_name" => "Quantity",
-                            "variable_name" => "quantity",
-                            "value" => "1"
-                        ]
+                "cancel_action" =>  route('pay.callback'),
+                "custom_fields" => [
+                    [
+                        "display_name" => "Laptop",
+                        "variable_name" => "laptop",
+                        "value" => "Laptop"
+                    ],
+                    [
+                        "display_name" => "Quantity",
+                        "variable_name" => "quantity",
+                        "value" => "1"
                     ]
-                    ]
+                ]
+            ]
         ];
 
         $pay = json_decode($this->initiate_payment($formData));
@@ -140,18 +145,37 @@ class PaystackController extends Controller
         }
     }
 
+
+
     public function payment_callback()
     {
         $response = json_decode($this->verify_payment(request('reference')));
 
 
         if ($response->status) {
-            return $data = $response->data;
-            return view('pay.callback_page')->with(compact('data'));
+            $data = $response->data;
+
+            $message = $data->status;
+            if ($message === 'success') {
+                $obj = new Payment;
+                $obj->payment_id = $data->reference;
+                $obj->product_name = $data->metadata->custom_fields[0]->value;
+                $obj->quantity = $data->metadata->custom_fields[0]->value;
+                $obj->amount = $data->amount / 100;
+                $obj->currency = $data->currency;
+                $obj->payment_status = "Completed";
+                $obj->payment_method = $data->channel;;
+                $obj->save();
+                return view('pay.payment-success')->with(compact('data'));
+            } else {
+                return back()->with('error', 'Unable to process payment');
+            }
         } else {
             return back()->withErrors($response->message);
         }
     }
+
+
 
     public function initiate_payment($formData)
     {
@@ -169,6 +193,8 @@ class PaystackController extends Controller
 
         return $response->getBody()->getContents();
     }
+
+
 
     public function verify_payment($reference)
     {
